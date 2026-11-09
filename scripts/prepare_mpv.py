@@ -2,6 +2,7 @@
 """Prepare pinned mpv-audio runtime bundles; no native code is downloaded at runtime."""
 import argparse
 import hashlib
+import http.client
 import json
 from pathlib import Path, PurePosixPath
 import platform
@@ -9,6 +10,8 @@ import re
 import shutil
 import stat
 import tempfile
+import time
+import urllib.error
 import urllib.request
 import zipfile
 
@@ -35,6 +38,28 @@ def read_lock():
     return lock
 
 
+def download_file(request, part):
+    for attempt in range(1, 4):
+        try:
+            # Reopen with wb so a retry never appends to a partial download.
+            with urllib.request.urlopen(request, timeout=120) as response, part.open("wb") as stream:
+                shutil.copyfileobj(response, stream)
+            return
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead) as error:
+            if isinstance(error, urllib.error.HTTPError):
+                retryable = error.code in (408, 429, 500, 502, 503, 504)
+                error.close()
+            elif isinstance(error, urllib.error.URLError):
+                retryable = isinstance(error.reason, (TimeoutError, ConnectionError))
+            else:
+                retryable = True
+            if not retryable or attempt == 3:
+                raise
+            delay = 2 ** attempt
+            print(f"Download attempt {attempt}/3 failed: {error}; retrying in {delay}s", flush=True)
+            time.sleep(delay)
+
+
 def download_archive(lock, asset):
     digest = asset["sha256"]
     if not re.fullmatch(r"[0-9a-f]{64}", digest):
@@ -54,8 +79,7 @@ def download_archive(lock, asset):
     with tempfile.TemporaryDirectory(prefix="download-", dir=cache) as tmp:
         part = Path(tmp) / "bundle.zip"
         request = urllib.request.Request(url, headers={"User-Agent": "TiaopinFM-native-preparation"})
-        with urllib.request.urlopen(request, timeout=120) as response, part.open("wb") as stream:
-            shutil.copyfileobj(response, stream)
+        download_file(request, part)
         if sha256(part) != digest:
             raise RuntimeError(f"libmpv archive SHA-256 mismatch: {name}")
         part.replace(archive)

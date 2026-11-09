@@ -1,4 +1,4 @@
-# Pushing a tag such as v0.2.0 builds the apps of macOS, Windows and
+# Pushing a tag such as v0.1.0 builds the apps of macOS, Windows and
 # Linux, then publishes the release after all packages are uploaded.
 # macOS bundles use ad-hoc signing and are not notarized.
 name: Release
@@ -57,7 +57,8 @@ jobs:
         include:
           - { name: macOS-arm64, os: macos-15, platform: "darwin/arm64" }
           - { name: macOS-amd64, os: macos-15-intel, platform: "darwin/amd64" }
-          - { name: Windows, os: ubuntu-24.04, platform: "windows/amd64,windows/arm64" }
+          - { name: Windows-amd64, os: windows-latest, platform: "windows/amd64" }
+          - { name: Windows-arm64, os: windows-11-arm, platform: "windows/arm64" }
           - { name: Linux-amd64, os: ubuntu-24.04, platform: "linux/amd64" }
           - { name: Linux-arm64, os: ubuntu-24.04-arm, platform: "linux/arm64" }
     steps:
@@ -65,9 +66,6 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Install NSIS, for the Windows installers
-        if: matrix.name == 'Windows'
-        run: sudo apt-get update && sudo apt-get install -y nsis
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
@@ -76,11 +74,18 @@ jobs:
       - name: Download and verify the pinned libmpv bundle
         run: python scripts/prepare_mpv.py --platform "${{ matrix.platform }}"
       - name: Test native decoding, spectrum and recognition
-        if: matrix.name != 'Windows'
         shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
         run: |
-          platform="${{ matrix.platform }}"
+          platform="$PLATFORM"
+          host="$(go env GOOS)/$(go env GOARCH)"
+          if [ "$host" != "$platform" ]; then
+            echo "Native tests require $platform, but Go is running as $host" >&2
+            exit 1
+          fi
           case "$platform" in
+            windows/*) lib=mpv-2.dll ;;
             darwin/*) lib=libmpv.dylib ;;
             linux/*) lib=libmpv.so.2 ;;
           esac
@@ -95,27 +100,13 @@ jobs:
       - name: Require update manifests
         shell: bash
         env:
-          PLATFORMS: ${{ matrix.platform }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
-          for platform in ${PLATFORMS//,/ }; do
-            target=${platform/\//-}
-            test -s "build/$target/update-$target.json"
-          done
+          target=${PLATFORM/\//-}
+          test -s "build/$target/update-$target.json"
       - name: Package portable Windows apps
-        if: matrix.name == 'Windows'
-        shell: bash
-        run: |
-          slug=$(jq -r .slug mygo.json)
-          version=$(jq -r .version mygo.json)
-          for arch in amd64 arm64; do
-            dir="build/windows-$arch"
-            test -f "$dir/TiaopinFM.exe"
-            test -f "$dir/$slug-setup-$version-$arch.exe"
-            # The installer is already built; only the portable ZIP gets this marker.
-            touch "$dir/portable.flag"
-            (cd "$dir" && zip -r "../$slug-portable-$version-windows-$arch.zip" . -x '*-setup-*.exe' 'data/*' '*.tar.gz' '*.delta' 'update-*.json')
-            rm "$dir/portable.flag"
-          done
+        if: runner.os == 'Windows'
+        run: python scripts/package_portable.py --platform "${{ matrix.platform }}"
       - name: Upload packages to the draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -131,27 +122,8 @@ jobs:
           fi
           gh release upload "$GITHUB_REF_NAME" "${packages[@]}" --repo "$GITHUB_REPOSITORY" --clobber
 
-  test-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: go.mod
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-      - name: Download and verify the pinned Windows libmpv bundle
-        run: python scripts/prepare_mpv.py --platform windows/amd64
-      - name: Test Windows native decoding, spectrum and recognition
-        shell: bash
-        run: |
-          export TIAOPIN_TEST_MPV=1
-          export TIAOPIN_MPV_LIBRARY="$PWD/resources/windows-amd64/mpv/mpv-2.dll"
-          go test ./internal/...
-
   publish:
-    needs: [build, test-windows]
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Publish the release

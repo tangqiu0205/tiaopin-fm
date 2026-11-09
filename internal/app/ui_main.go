@@ -4,6 +4,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/plugins/updater"
 	"github.com/egoist/mygo/ui"
@@ -106,11 +107,23 @@ func (a *app) sidebar(c *ui.Context) {
 	// Where nothing in it takes the press, the sidebar moves the window, as
 	// the title bar it reaches up into would.
 	ui.Column(c).Fill().Padding(top, 14, playerBarHeight+18, 14).Gap(6).DragWindow().Children(func() {
-		ui.Row(c).Gap(10).AlignItems(ui.Center).Padding(8, 10, 24, 10).Children(func() {
-			ui.Box(c).Size(32, 32).Radius(10).Background(a.pal.accent).Center().Children(func() {
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Padding(8, 4, 24, 4).Children(func() {
+			ui.Box(c).Size(32, 32).Shrink(0).Radius(10).Background(a.pal.accent).Center().Children(func() {
 				ui.Icon(c, iconRadio).Size(20, 20).TextColor(a.pal.onAccent)
 			})
-			ui.Text(c, appTitle).FontSize(18).FontWeight(800).TextColor(a.pal.text)
+			ui.Row(c).Grow(1).MinWidth(0).Gap(6).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, appTitle).FontSize(18).FontWeight(800).TextColor(a.pal.text).Shrink(0)
+				version := mygo.App.Version()
+				if version != "" {
+					version = "v" + version
+				} else {
+					version = "开发版"
+				}
+				ui.Box(c).Height(18).MinWidth(24).MaxWidth(68).Shrink(1).PaddingX(6).Radius(9).
+					Background(a.pal.hover).Border(0.5, a.pal.hairline).Center().Tooltip(version).Children(func() {
+					ui.Text(c, version).FontSize(9).FontWeight(500).FontFeatures("tnum").TextColor(a.pal.muted).SingleLine()
+				})
+			})
 		})
 		ui.Text(c, "电台探索").FontSize(11).FontWeight(600).TextColor(a.pal.faint).Margin(10, 10, 8, 0)
 		a.navLink(c, "发现电台", iconRadio, pageRadio, 0)

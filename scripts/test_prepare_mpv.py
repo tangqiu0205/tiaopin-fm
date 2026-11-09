@@ -60,6 +60,72 @@ def environment(data, target="windows/amd64"):
 
 
 class PrepareMPVTests(unittest.TestCase):
+    def test_transient_http_failure_retries_then_verifies_archive(self):
+        data = runtime_archive()
+        with environment(data) as (root, lock, network), patch.object(mpv.time, "sleep") as sleep:
+            network.side_effect = [mpv.urllib.error.HTTPError("https://github.com/bundle", 504, "Gateway Time-out", {}, None), io.BytesIO(data)]
+            asset = lock["platforms"]["windows/amd64"]
+            archive = mpv.download_archive(lock, asset)
+            self.assertEqual(archive.read_bytes(), data)
+            self.assertEqual(network.call_count, 2)
+            sleep.assert_called_once_with(2)
+            self.assertEqual(list((root / ".mygo/mpv").glob("download-*")), [])
+
+    def test_download_retries_are_bounded_and_preserve_previous_bundle(self):
+        with environment(runtime_archive()) as (root, _, network), patch.object(mpv.time, "sleep") as sleep:
+            network.side_effect = [mpv.urllib.error.HTTPError("https://github.com/bundle", 504, "Gateway Time-out", {}, None)
+                                   for _ in range(3)]
+            final = root / "resources/windows-amd64/mpv"
+            final.mkdir(parents=True)
+            (final / "mpv-2.dll").write_bytes(b"previous")
+            with self.assertRaises(mpv.urllib.error.HTTPError):
+                mpv.prepare("windows/amd64")
+            self.assertEqual(network.call_count, 3)
+            self.assertEqual([c.args[0] for c in sleep.call_args_list], [2, 4])
+            self.assertEqual((final / "mpv-2.dll").read_bytes(), b"previous")
+            self.assertEqual(list((root / ".mygo/mpv").iterdir()), [])
+
+    def test_permanent_http_and_tls_errors_are_not_retried(self):
+        errors = [mpv.urllib.error.HTTPError("https://github.com/bundle", code, "permanent", {}, None)
+                  for code in (401, 403, 404)]
+        errors.append(mpv.urllib.error.URLError("certificate verification failed"))
+        for error in errors:
+            with self.subTest(error=error), environment(runtime_archive()) as (_, lock, network), patch.object(mpv.time, "sleep") as sleep:
+                network.side_effect = error
+                with self.assertRaises(mpv.urllib.error.URLError):
+                    mpv.download_archive(lock, lock["platforms"]["windows/amd64"])
+                self.assertEqual(network.call_count, 1)
+                sleep.assert_not_called()
+
+    def test_partial_download_is_replaced_on_retry(self):
+        class BrokenStream(io.BytesIO):
+            def read(self, size=-1):
+                if self.tell():
+                    raise ConnectionResetError("connection reset during response")
+                return super().read(size)
+
+        data = runtime_archive()
+        with environment(data) as (_, lock, network), patch.object(mpv.time, "sleep"):
+            network.side_effect = [BrokenStream(b"partial" * len(data)), io.BytesIO(data)]
+            archive = mpv.download_archive(lock, lock["platforms"]["windows/amd64"])
+            self.assertEqual(archive.read_bytes(), data)
+            self.assertEqual(network.call_count, 2)
+
+    def test_timeout_retries_but_checksum_failure_does_not(self):
+        data = runtime_archive()
+        for error in (TimeoutError("timed out"), mpv.urllib.error.URLError(TimeoutError("timed out"))):
+            with self.subTest(error=error), environment(data) as (_, lock, network), patch.object(mpv.time, "sleep") as sleep:
+                network.side_effect = [error, io.BytesIO(data)]
+                mpv.download_archive(lock, lock["platforms"]["windows/amd64"])
+                self.assertEqual(network.call_count, 2)
+                sleep.assert_called_once_with(2)
+        with environment(data) as (_, lock, network), patch.object(mpv.time, "sleep") as sleep:
+            network.side_effect = lambda *a, **k: io.BytesIO(b"wrong content")
+            with self.assertRaisesRegex(RuntimeError, "archive SHA-256"):
+                mpv.download_archive(lock, lock["platforms"]["windows/amd64"])
+            self.assertEqual(network.call_count, 1)
+            sleep.assert_not_called()
+
     def test_production_lock_pins_all_six_desktop_targets(self):
         lock = mpv.read_lock()
         self.assertEqual(set(lock["platforms"]), {f"{system}/{arch}" for system in mpv.LIBRARIES for arch in ("amd64", "arm64")})
