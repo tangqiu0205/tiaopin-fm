@@ -49,7 +49,7 @@ func rounded(x, y float64) bool {
 	return math.Hypot(dx, dy) <= 150
 }
 
-func render(size int, template bool) *image.NRGBA {
+func render(size int, template, appIcon bool) *image.NRGBA {
 	img := image.NewNRGBA(image.Rect(0, 0, size, size))
 	const samples = 4
 	for y := 0; y < size; y++ {
@@ -65,6 +65,11 @@ func render(size int, template bool) *image.NRGBA {
 							a++
 						}
 						continue
+					}
+					// Desktop PNGs need less transparent padding at taskbar sizes;
+					// keep the tray and macOS Icon Composer artwork unchanged.
+					if appIcon {
+						px, py = (px-512)/1.12+512, (py-512)/1.12+512
 					}
 					if !rounded(px, py) {
 						continue
@@ -105,13 +110,14 @@ func main() {
 		path     string
 		size     int
 		template bool
+		appIcon  bool
 	}{
-		{"resources/icon.png", 1024, false},
-		{"resources/icon-dev.png", 1024, false},
-		{"internal/app/tray/tray.png", 64, false},
-		{"internal/app/tray/tray-template.png", 36, true},
+		{"resources/icon.png", 1024, false, true},
+		{"resources/icon-dev.png", 1024, false, true},
+		{"internal/app/tray/tray.png", 64, false, false},
+		{"internal/app/tray/tray-template.png", 36, true, false},
 	} {
-		if err := save(item.path, render(item.size, item.template)); err != nil {
+		if err := save(item.path, render(item.size, item.template, item.appIcon)); err != nil {
 			log.Fatal(err)
 		}
 	}
