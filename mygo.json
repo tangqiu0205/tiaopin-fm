@@ -2,7 +2,7 @@
   "name": "TiaopinFM",
   "identifier": "io.github.tangqiu0205.tiaopinfm",
   "slug": "tiaopin-fm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "out": "build",
   "buildCommand": "python scripts/prepare_mpv.py",
   "updates": {
