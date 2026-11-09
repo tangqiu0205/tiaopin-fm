@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "repository": "tangqiu0205/mpv-audio",
+  "tag": "libmpv-audio-0.42.0-r1",
+  "version": "0.42.0",
+  "channel": "candidate",
+  "platforms": {
+    "linux/amd64": {
+      "asset": "mpv-audio-linux-amd64.zip",
+      "sha256": "96a47574d1cf00d1bc184f179aa1220a4e8a0a34e49d897ba2214de8d22fb18e"
+    },
+    "linux/arm64": {
+      "asset": "mpv-audio-linux-arm64.zip",
+      "sha256": "d5d093f4875dd26cff492c0533d632446452fc6f3dcaa234958c64f9362b50ac"
+    },
+    "darwin/amd64": {
+      "asset": "mpv-audio-darwin-amd64.zip",
+      "sha256": "c1af2ecfea6a595c813629c74ccd505f807da12037128342f42ab2fa513bc9db"
+    },
+    "darwin/arm64": {
+      "asset": "mpv-audio-darwin-arm64.zip",
+      "sha256": "7172cb8cc904845645c07954d099fed84582c3359f4bbe427d08eb8aa038431d"
+    },
+    "windows/amd64": {
+      "asset": "mpv-audio-windows-amd64.zip",
+      "sha256": "8727b8c5ac955712137f75c10f87ccbcd74c17559f1014ca472dc17d4b230b2d"
+    },
+    "windows/arm64": {
+      "asset": "mpv-audio-windows-arm64.zip",
+      "sha256": "22618c490b759eab5f39cd666a8f70f4b59e781a8490cdcb001b9b8225464b6e"
+    }
+  }
+}

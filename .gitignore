@@ -1,0 +1,31 @@
+/build/
+/.mygo/
+mygo_windows_*.syso
+/tiaopin-fm
+/tiaopin-fm.exe
+/node_modules/
+/.openidea/
+
+# Local environment and credentials (commit examples explicitly)
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# Local editor, OS and diagnostic files
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+*.log
+*.prof
+/coverage.out
+
+# Generated native playback bundles
+/resources/*-amd64/mpv/
+/resources/*-arm64/mpv/
+/resources/*-amd64/mpv-stage-*/
+/resources/*-arm64/mpv-stage-*/
+__pycache__/

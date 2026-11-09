@@ -1,0 +1,25 @@
+{
+  "name": "TiaopinFM",
+  "identifier": "io.github.tangqiu0205.tiaopinfm",
+  "slug": "tiaopin-fm",
+  "version": "0.1.0",
+  "out": "build",
+  "buildCommand": "python scripts/prepare_mpv.py",
+  "updates": {
+    "publicKey": "kRrgQn1U8KBkwXF5PA+uT8vwtFso791dXMFll9qr9TE=",
+    "github": "tangqiu0205/tiaopin-fm"
+  },
+  "macos": {
+    "icon": "icon/AppIcon.icon",
+    "minimumSystemVersion": "15.0"
+  },
+  "linux": {
+    "comment": "FM 网络电台",
+    "categories": [
+      "AudioVideo",
+      "Audio",
+      "Player"
+    ],
+    "webview": false
+  }
+}
