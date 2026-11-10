@@ -29,6 +29,12 @@ func TestRadioFiltersCombineAndClear(t *testing.T) {
 			a.radio.stations = sampleStations()
 			tt := ui.NewTester(a.view, width, 800)
 			tt.Frame()
+			region, regionOK := tt.Find("地区")
+			language, languageOK := tt.Find("语言")
+			category, categoryOK := tt.Find("全部内容")
+			if !regionOK || !languageOK || !categoryOK || region.X+region.W > language.X || language.X+language.W > float32(width)-pagePad || region.Y+region.H > category.Y {
+				t.Fatalf("filters not aligned above categories: region=%+v language=%+v category=%+v", region, language, category)
+			}
 			click := func(label string) {
 				t.Helper()
 				if err := tt.Click(label); err != nil {

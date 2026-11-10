@@ -51,7 +51,6 @@ var (
 	iconComment     = strokeIcon(`<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>`)
 	iconPlus        = strokeIcon(`<path d="M12 5v14"/><path d="M5 12h14"/>`)
 	iconCheck       = strokeIcon(`<path d="m5 12 4 4L19 6"/>`)
-	iconDice        = strokeIcon(`<g transform="rotate(-12 12 12)"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="8" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="16" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="16" r="1" fill="currentColor" stroke="none"/></g>`)
 	iconUpdate      = strokeIcon(`<path d="M12 16V4m-5 5 5-5 5 5M5 20h14"/>`)
 	iconThemeSystem = strokeIcon(`<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>`)
 	iconThemeLight  = strokeIcon(`<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/>`)

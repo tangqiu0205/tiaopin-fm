@@ -64,6 +64,27 @@ func TestStationBarIsLive(t *testing.T) {
 	}
 }
 
+// The favorite action stays in place as playback changes state.
+func TestStationFavoritePositionAcrossPlaybackStates(t *testing.T) {
+	a := newTestApp()
+	a.radio.stations = sampleStations()[:1]
+	tt := ui.NewTester(a.view, 1200, 800)
+	tt.Frame()
+	before, ok := tt.Find("收藏")
+	if !ok {
+		t.Fatal("favorite button not found")
+	}
+	a.pl.Restore(player.Session{Stations: []player.Track{stationTrack(a.radio.stations[0])}, At: 0})
+	tt.Frame()
+	paused, _ := tt.Find("收藏")
+	a.pl.TogglePlay()
+	tt.Frame()
+	playing, _ := tt.Find("收藏")
+	if before != paused || paused != playing {
+		t.Fatalf("favorite moved: idle=%+v paused=%+v playing=%+v", before, paused, playing)
+	}
+}
+
 // Usable network addresses sort first without changing directory order.
 func TestSortStationsPlayableFirst(t *testing.T) {
 	list := []radio.Station{

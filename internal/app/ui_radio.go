@@ -391,7 +391,14 @@ func (a *app) radioHeader(c *ui.Context) {
 	case pageRecent:
 		title, over, empty = "最近收听", "最近播过", "还没有听过的电台，听一个就会出现在这里。"
 	}
-	a.heading(c, title, over)
+	if a.page == pageRadio {
+		ui.Row(c).Gap(12).Wrap().AlignItems(ui.Center).Children(func() {
+			ui.Box(c).Grow(1).MinWidth(120).Children(func() { a.heading(c, title, over) })
+			a.locationFilters(c)
+		})
+	} else {
+		a.heading(c, title, over)
+	}
 	if a.page != pageRadio {
 		if len(a.pageStations()) == 0 {
 			ui.Box(c).Height(56).Center().Children(func() {
@@ -463,8 +470,8 @@ func (a *app) searchStations() {
 	a.loadStations()
 }
 
-// browseState combines directory facets; results always use popularity order.
-func (a *app) browseState(c *ui.Context) {
+// locationFilters keeps the independent region and language facets by the heading.
+func (a *app) locationFilters(c *ui.Context) {
 	if a.radio.country == "" {
 		a.radio.country = stationCountries[0].label
 	}
@@ -472,43 +479,47 @@ func (a *app) browseState(c *ui.Context) {
 		a.radio.language = stationLanguages[0].label
 	}
 	changed := false
-	ui.Row(c).Gap(12).Wrap().AlignItems(ui.Center).Justify(ui.End).Children(func() {
-		ui.Box(c.Key("content-filter")).Grow(1).Basis(500).MinWidth(0).Children(func() {
-			labels := make([]string, len(stationTags))
-			for i, tag := range stationTags {
-				labels[i] = tag.label
-			}
-			if a.chips(c.Key("radio-tag"), &a.radio.tag, labels) {
-				changed = true
-			}
-		})
-		ui.Row(c.Key("location-filters")).Gap(12).Shrink(0).AlignItems(ui.Center).Children(func() {
-			countries := make([]string, len(stationCountries))
-			for i, country := range stationCountries {
-				countries[i] = country.label
-			}
-			if ui.Select(c.Key("radio-country"), &a.radio.country, countries).
-				Width(116).MinWidth(0).Height(30).Background(a.pal.surface).Radius(8).Label("地区").
-				OnChange(a.saveRadioFilters).Changed() {
-				changed = true
-			}
-			languages := make([]string, len(stationLanguages))
-			for i, language := range stationLanguages {
-				languages[i] = language.label
-			}
-			if ui.Select(c.Key("radio-language"), &a.radio.language, languages).
-				Width(106).MinWidth(0).Height(30).Background(a.pal.surface).Radius(8).Label("语言").
-				OnChange(a.saveRadioFilters).Changed() {
-				changed = true
-			}
-		})
+	ui.Row(c.Key("location-filters")).Gap(12).Shrink(0).AlignItems(ui.Center).Children(func() {
+		countries := make([]string, len(stationCountries))
+		for i, country := range stationCountries {
+			countries[i] = country.label
+		}
+		if ui.Select(c.Key("radio-country"), &a.radio.country, countries).
+			Width(116).MinWidth(0).Height(30).Background(a.pal.surface).Radius(8).Label("地区").
+			OnChange(a.saveRadioFilters).Changed() {
+			changed = true
+		}
+		languages := make([]string, len(stationLanguages))
+		for i, language := range stationLanguages {
+			languages[i] = language.label
+		}
+		if ui.Select(c.Key("radio-language"), &a.radio.language, languages).
+			Width(106).MinWidth(0).Height(30).Background(a.pal.surface).Radius(8).Label("语言").
+			OnChange(a.saveRadioFilters).Changed() {
+			changed = true
+		}
 	})
 	if changed {
-		// The controls live inside the list header: request a scroll rather
-		// than replacing the list state while its rows are being built.
-		a.listScroll.ScrollTo(0, ui.Start)
-		a.loadStations()
+		a.refreshRadioFilters()
 	}
+}
+
+// browseState shows the content facet independently of region and language.
+func (a *app) browseState(c *ui.Context) {
+	labels := make([]string, len(stationTags))
+	for i, tag := range stationTags {
+		labels[i] = tag.label
+	}
+	if a.chips(c.Key("radio-tag"), &a.radio.tag, labels) {
+		a.refreshRadioFilters()
+	}
+}
+
+func (a *app) refreshRadioFilters() {
+	// The controls live inside the list header: request a scroll rather
+	// than replacing the list state while its rows are being built.
+	a.listScroll.ScrollTo(0, ui.Start)
+	a.loadStations()
 }
 
 // searchState clears the submitted name without clearing the other facets.
@@ -616,11 +627,13 @@ func (a *app) stationTile(c *ui.Context, st radio.Station, i int) {
 			})
 			ui.Column(c).Width(28).Gap(4).AlignItems(ui.Center).Children(func() {
 				a.favoriteButton(c, st)
-				if playing && a.pl.Playing() {
-					a.nowPlayingBars(c)
-				} else if playing {
-					ui.Icon(c, iconPause).Size(10, 10).TextColor(p.accent)
-				}
+				ui.Box(c).Size(18, 16).Center().Children(func() {
+					if playing && a.pl.Playing() {
+						a.nowPlayingBars(c)
+					} else if playing {
+						ui.Icon(c, iconPause).Size(14, 14).TextColor(p.accent)
+					}
+				})
 			})
 		})
 	})

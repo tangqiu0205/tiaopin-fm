@@ -319,12 +319,12 @@ func (a *app) heading(c *ui.Context, title, over string) {
 // nowPlayingBars marks the station playing, its bars moving with what it
 // plays.
 func (a *app) nowPlayingBars(c *ui.Context) {
-	el := ui.Box(c).Size(14, 14)
+	el := ui.Box(c).Size(18, 16)
 	el.Draw(func(p *ui.Painter, r ui.Rect) {
 		if levels, ok := a.pl.Levels(); ok {
 			a.rowBars.step(time.Now(), levels, true)
 		}
-		drawBars(p, r, &a.rowBars, 3, a.pal.accent, 2)
+		drawBars(p, r, &a.rowBars, 4, a.pal.accent, 4)
 	})
 	c.After(time.Second / 30)
 }
