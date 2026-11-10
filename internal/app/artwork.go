@@ -17,6 +17,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
 )
 
@@ -54,6 +55,12 @@ const artKeep = 5 * time.Minute
 // a script it carried.
 const artFailKeep = time.Hour
 
+// Bound the number and decoded dimensions of station logos independently of
+// the larger artwork used by the player and recognition views.
+const stationIconLimit = 128
+const stationIconSize = 192
+const stationIconMaxPixels = 16 * 1024 * 1024
+
 func newArtCache(post func(func())) *artCache {
 	return &artCache{art: map[string]*artwork{}, busy: map[string]bool{}, sem: make(chan struct{}, 8), post: post, now: time.Now, swept: time.Now()}
 }
@@ -80,12 +87,22 @@ func (c *artCache) sweep(now time.Time) {
 
 // get returns the cover at url, or nil while it loads.
 func (c *artCache) get(url string, backdrop bool) *artwork {
+	return c.getArt(url, backdrop, false)
+}
+
+func (c *artCache) getStationIcon(url string) *artwork {
+	return c.getArt(url, false, true)
+}
+
+func (c *artCache) getArt(url string, backdrop, stationIcon bool) *artwork {
 	if url == "" {
 		return nil
 	}
 	key := url
 	if backdrop {
 		key += "#backdrop"
+	} else if stationIcon {
+		key += "#station-icon"
 	}
 	now := c.now()
 	c.sweep(now)
@@ -97,10 +114,23 @@ func (c *artCache) get(url string, backdrop bool) *artwork {
 	if c.busy[key] {
 		return nil
 	}
+	// Do not accumulate waiting goroutines while the user scrolls rapidly.
+	// A completed load schedules another frame, which can request visible icons.
+	select {
+	case c.sem <- struct{}{}:
+	default:
+		return nil
+	}
 	c.busy[key] = true
 	go func() {
-		c.sem <- struct{}{}
-		bmp, img, err := loadArt(url)
+		var bmp *ui.Bitmap
+		var img image.Image
+		var err error
+		if stationIcon {
+			bmp, img, err = loadStationIcon(url)
+		} else {
+			bmp, img, err = loadArt(url)
+		}
 		<-c.sem
 		var blurred *image.RGBA
 		var tint ui.Color
@@ -114,6 +144,9 @@ func (c *artCache) get(url string, backdrop bool) *artwork {
 			delete(c.busy, key)
 			if err != nil {
 				c.art[key] = &artwork{failed: true, used: c.now()}
+				if stationIcon {
+					c.trimStationIcons()
+				}
 				return
 			}
 			a := &artwork{bmp: bmp, tint: tint, used: c.now()}
@@ -121,12 +154,67 @@ func (c *artCache) get(url string, backdrop bool) *artwork {
 				a.backdrop = ui.NewBitmap(blurred)
 			}
 			c.art[key] = a
+			if stationIcon {
+				c.trimStationIcons()
+			}
 			// Shown by the frame post draws, the cover drops its pixels,
 			// which its data decodes again if they are needed.
 			time.AfterFunc(artRelease, func() { mygo.RunOnMain(bmp.ReleasePixels) })
 		})
 	}()
 	return nil
+}
+
+func (c *artCache) trimStationIcons() {
+	for {
+		count := 0
+		oldest := ""
+		var used time.Time
+		for key, art := range c.art {
+			if !strings.HasSuffix(key, "#station-icon") {
+				continue
+			}
+			count++
+			if oldest == "" || art.used.Before(used) {
+				oldest, used = key, art.used
+			}
+		}
+		if count <= stationIconLimit {
+			return
+		}
+		delete(c.art, oldest)
+	}
+}
+
+func loadStationIcon(url string) (*ui.Bitmap, image.Image, error) {
+	data, err := fetchImageBytes(url)
+	if err != nil {
+		return nil, nil, err
+	}
+	return decodeStationIcon(data)
+}
+
+func decodeStationIcon(data []byte) (*ui.Bitmap, image.Image, error) {
+	data = stillCover(data)
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, nil, err
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 || int64(cfg.Width)*int64(cfg.Height) > stationIconMaxPixels {
+		return nil, nil, errors.New("station icon dimensions exceed limit")
+	}
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, nil, err
+	}
+	w, h := cfg.Width, cfg.Height
+	if max(w, h) > stationIconSize {
+		scale := float64(stationIconSize) / float64(max(w, h))
+		w, h = max(1, int(math.Round(float64(w)*scale))), max(1, int(math.Round(float64(h)*scale)))
+	}
+	resized := image.NewRGBA(image.Rect(0, 0, w, h))
+	draw.CatmullRom.Scale(resized, resized.Bounds(), img, img.Bounds(), draw.Src, nil)
+	return ui.NewBitmap(resized), resized, nil
 }
 
 // artRelease is how long a cover keeps its pixels once loaded: past the

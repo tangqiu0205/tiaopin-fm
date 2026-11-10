@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -30,6 +31,36 @@ func serve(body []byte, ct string) *httptest.Server {
 		}
 		_, _ = w.Write(body)
 	}))
+}
+
+func TestStationIconDownscalesAndPreservesAspect(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 512, 256))
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatal(err)
+	}
+	bmp, resized, err := decodeStationIcon(buf.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, h := bmp.Size()
+	if w != stationIconSize || h != stationIconSize/2 || resized.Bounds().Dx() != w {
+		t.Fatalf("unexpected resized icon: %dx%d", w, h)
+	}
+}
+
+func TestStationIconCacheBounded(t *testing.T) {
+	c := newArtCache(func(f func()) { f() })
+	base := time.Unix(1000, 0)
+	c.art["playing-cover"] = &artwork{used: base}
+	for i := 0; i <= stationIconLimit; i++ {
+		key := fmt.Sprintf("%03d#station-icon", i)
+		c.art[key] = &artwork{used: base.Add(time.Duration(i) * time.Second)}
+		c.trimStationIcons()
+	}
+	if len(c.art) != stationIconLimit+1 || c.art["000#station-icon"] != nil || c.art["playing-cover"] == nil {
+		t.Fatal("station icon eviction did not preserve the limit and unrelated covers")
+	}
 }
 
 func TestFetchKeepsImage(t *testing.T) {

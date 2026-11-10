@@ -640,7 +640,7 @@ func (a *app) stationBadge(c *ui.Context, name, icon string, size, radius float3
 		bg, ink = white.Alpha(0.14), white.Alpha(0.92)
 	}
 	box := ui.Box(c).Size(size, size).Shrink(0).Radius(radius).Center().Background(bg)
-	bmp := bitmap(a.art.get(icon, false))
+	bmp := bitmap(a.art.getStationIcon(icon))
 	in := artIn(box, bmp)
 	box.Children(func() {
 		if in < 1 {
